@@ -1,0 +1,183 @@
+<?php
+
+namespace App\Http\Controllers\API;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use App\Models\Classroom;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
+
+use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver;
+use Illuminate\Support\Facades\File;
+
+class ClassroomController extends Controller
+{
+    /**
+     * Display a listing of classrooms.
+     */
+    public function index()
+    {
+        $classrooms = Classroom::with('professor')->get();
+
+        return response()->json($classrooms, 200);
+    }
+
+    public function authIndex()
+    {
+        $profId = Auth::id();
+
+        if (!$profId) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $classrooms = Classroom::with('professor')
+            ->where('prof_id', $profId)
+            ->get();
+
+        return response()->json($classrooms, 200);
+    }
+    
+    /**
+     * Store a newly created classroom.
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name'        => 'required|string|max:255',
+            'subject'     => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'image'       => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
+
+        $validated['prof_id'] = Auth::id();
+
+        // Handle image upload with Intervention Image
+        if ($request->hasFile('image')) {
+            $manager = new ImageManager(new Driver());
+
+            // Read and optimize image
+            $image = $manager->read($request->file('image'))
+                ->resize(800, null, function ($constraint) {
+                    $constraint->aspectRatio();
+                    $constraint->upsize();
+                })
+                ->toJpeg(80); // Save as JPEG with 80% quality
+
+            // Generate filename and ensure directory
+            $filename = 'classroom-' . Str::slug($request->name) . '-' . time() . '.jpg';
+            $uploadPath = public_path('uploads/classrooms');
+            File::ensureDirectoryExists($uploadPath);
+            $imagePath = $uploadPath . '/' . $filename;
+
+            // Save optimized image
+            $image->save($imagePath);
+
+            // Store relative path in DB
+            $validated['image'] = '/uploads/classrooms/' . $filename;
+        }
+
+        // Generate a unique classroom code
+        do {
+            $code = strtoupper(Str::random(6));
+        } while (Classroom::where('code', $code)->exists());
+
+        $validated['code'] = $code;
+
+        $classroom = Classroom::create($validated);
+
+        return response()->json($classroom, 201);
+    }
+
+    /**
+     * Display the specified classroom.
+     */
+    public function show($id)
+    {
+        $classroom = Classroom::with(['professor', 'students'])->find($id);
+
+        if (!$classroom) {
+            return response()->json(['message' => 'Classroom not found'], 404);
+        }
+
+        return response()->json($classroom, 200);
+    }
+
+    /**
+     * Update the specified classroom.
+     */
+    public function update(Request $request, $id)
+    {
+        $classroom = Classroom::find($id);
+
+        if (!$classroom) {
+            return response()->json(['message' => 'Classroom not found'], 404);
+        }
+
+        $validated = $request->validate([
+            'name'        => 'sometimes|required|string|max:255',
+            'subject'     => 'sometimes|required|string|max:255',
+            'description' => 'nullable|string',
+            'image'       => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
+
+        // Always enforce professor ownership
+        $validated['prof_id'] = Auth::id();
+
+        // Handle image upload with Intervention Image
+        if ($request->hasFile('image')) {
+            $manager = new ImageManager(new Driver());
+
+            // Read and optimize image
+            $image = $manager->read($request->file('image'))
+                ->resize(800, null, function ($constraint) {
+                    $constraint->aspectRatio();
+                    $constraint->upsize();
+                })
+                ->toJpeg(80); // Save as JPEG with 80% quality
+
+            // Generate filename and ensure directory
+            $filename = 'classroom-' . Str::slug($request->name ?? $classroom->name) . '-' . time() . '.jpg';
+            $uploadPath = public_path('uploads/classrooms');
+            File::ensureDirectoryExists($uploadPath);
+            $imagePath = $uploadPath . '/' . $filename;
+
+            // Save optimized image
+            $image->save($imagePath);
+
+            // Delete old image if exists
+            if ($classroom->image && File::exists(public_path($classroom->image))) {
+                File::delete(public_path($classroom->image));
+            }
+
+            // Store relative path in DB
+            $validated['image'] = '/uploads/classrooms/' . $filename;
+        }
+
+        $classroom->update($validated);
+
+        return response()->json($classroom, 200);
+    }
+
+    /**
+     * Remove the specified classroom.
+     */
+    public function destroy($id)
+    {
+        $classroom = Classroom::find($id);
+
+        if (!$classroom) {
+            return response()->json(['message' => 'Classroom not found'], 404);
+        }
+
+        // Delete image file if it exists
+        if ($classroom->image && File::exists(public_path($classroom->image))) {
+            File::delete(public_path($classroom->image));
+        }
+
+        $classroom->delete();
+
+        return response()->json(['message' => 'Classroom deleted successfully'], 200);
+    }
+}

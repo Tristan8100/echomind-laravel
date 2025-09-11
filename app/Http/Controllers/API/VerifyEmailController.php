@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
+use App\Models\Professor;
 
 class VerifyEmailController extends Controller
 {
@@ -81,8 +82,11 @@ class VerifyEmailController extends Controller
         $record->verified = true;
         $record->save();
         
-        User::where('email', $email)->update(['email_verified_at' => now()]);
-
+        if (Professor::where('email', $email)->exists()) {
+            Professor::where('email', $email)->update(['email_verified_at' => now()]);
+        } elseif (User::where('email', $email)->exists()) {
+            User::where('email', $email)->update(['email_verified_at' => now()]);
+        }
         return response()->json(['message' => 'Email verified successfully!']);
     }
 }

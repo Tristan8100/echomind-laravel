@@ -26,7 +26,7 @@ Route::post('/send-otp', [VerifyEmailController::class, 'sendOtp'])
     ->name('verification.send')
     ->middleware(['throttle:6,1']);
 
-Route::post('/verify-otp', [VerifyEmailController::class, 'verifyOtp'])
+Route::post('/verify-otp', [VerifyEmailController::class, 'verifyOtp']) //STUDENTS AND PROFESSORS
     ->name('verification.verify')
     ->middleware(['throttle:6,1']);
 
@@ -50,3 +50,11 @@ Route::post('admin-change-password', [AdminAuthenticationController::class, 'cha
 // --------------- Register and Login (PROFESSOR) ----------------//
 Route::post('professor-login', [ProfessorAuthenticationController::class, 'login']); //not yet tested
 Route::post('professor-change-password', [ProfessorAuthenticationController::class, 'changePasswordProffesor']);
+Route::post('professor-register', [ProfessorAuthenticationController::class, 'register']); //not yet tested //ADMIN ROUTE BTW
+
+
+Route::middleware('auth:user-api')->group(function () {
+    Route::get('hi', function () {
+        return response()->json(['message' => 'Hi!']);
+    })->name('hi');
+});

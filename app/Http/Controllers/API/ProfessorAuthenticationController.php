@@ -7,9 +7,97 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Hash;
 use App\Models\Professor;
+use Illuminate\Support\Facades\Mail;
+use App\Models\EmailVerification;
+use Illuminate\Support\Facades\Log;
+use App\Models\User;
+use App\Models\Admin;
+
 
 class ProfessorAuthenticationController extends Controller
 {
+    public function register(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'name'     => 'required|string|min:4',
+                'email'    => [
+                    'required',
+                    'string',
+                    'email',
+                    'max:255',
+                    function ($attribute, $value, $fail) {
+                        if (
+                            User::where('email', $value)->exists()
+                             || Professor::where('email', $value)->exists()
+                              || Admin::where('email', $value)->exists()
+                        ) {
+                            $fail('The '.$attribute.' has already been taken.');
+                        }
+                    },
+                ],
+                'password' => 'required|string|min:8',
+            ]);
+
+            // Check if generated email already exists
+            if (Professor::where('email', $validated['email'])->exists()) {
+                return response()->json([
+                    'response_code' => 422,
+                    'status'        => 'error',
+                    'message'       => 'A user with this student number already exists.',
+                ], 422);
+            }
+
+            $user = Professor::create([
+                'name'     => $validated['name'],
+                'email'    => $validated['email'],
+                'password' => Hash::make($validated['password']),
+            ]);
+
+            // Generate 6-digit OTP
+            $otp = rand(100000, 999999);
+
+            // Create or update the OTP record
+            EmailVerification::updateOrCreate(
+                ['email' => $user->email],
+                [
+                    'otp'       => $otp,
+                    'verified'  => false,
+                    'created_at'=> now(),
+                    'updated_at'=> now(),
+                ]
+            );
+
+            // Send OTP email
+            Mail::raw("Your verification OTP is: $otp. It expires in 10 minutes.", function ($message) use ($user) {
+                $message->to($user->email)
+                        ->subject('Email Verification OTP');
+            });
+
+            return response()->json([
+                'message' => 'OTP sent to your email.',
+                'email'   => $user->email
+            ]);
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'response_code' => 422,
+                'status'        => 'error',
+                'message'       => 'Validation failed',
+                'errors'        => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Registration Error: ' . $e->getMessage());
+
+            return response()->json([
+                'response_code' => 500,
+                'status'        => 'error',
+                'message'       => 'Registration failed',
+            ], 500);
+        }
+    }
+
+
     public function login(Request $request)
     {
         $credentials = $request->validate([
@@ -17,9 +105,9 @@ class ProfessorAuthenticationController extends Controller
             'password' => 'required|string',
         ]);
 
-        $admin = Professor::where('email', $credentials['email'])->first();
+        $professor = Professor::where('email', $credentials['email'])->first();
 
-        if (!$admin || !Hash::check($credentials['password'], $admin->password)) {
+        if (!$professor || !Hash::check($credentials['password'], $professor->password)) {
             return response()->json([
                 'response_code' => 401,
                 'status' => 'error',
@@ -27,9 +115,17 @@ class ProfessorAuthenticationController extends Controller
             ], 401);
         }
 
+        if (!$professor->email_verified_at) {
+            return response()->json([
+                'response_code' => 401,
+                'status'        => 'error',
+                'message'       => 'Email not verified',
+            ], 401);
+        }
+
         // Delete old tokens & create new token
-        $admin->tokens()->delete();
-        $token = $admin->createToken('admin-auth-token')->plainTextToken;
+        $professor->tokens()->delete();
+        $token = $professor->createToken('admin-auth-token')->plainTextToken;
 
         return response()->json([
             'response_code' => 200,
@@ -38,9 +134,9 @@ class ProfessorAuthenticationController extends Controller
             'token' => $token,
             'token_type' => 'Bearer',
             'user_info' => [
-                'id' => $admin->id,
-                'name' => $admin->name,
-                'email' => $admin->email,
+                'id' => $professor->id,
+                'name' => $professor->name,
+                'email' => $professor->email,
             ]
         ]);
     }

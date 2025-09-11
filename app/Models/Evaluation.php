@@ -11,7 +11,7 @@ class Evaluation extends Model
 
     protected $table = 'evaluations';
 
-    protected $fillable = ['classroom_student_id', 'rating', 'comment'];
+    protected $fillable = ['classroom_student_id', 'rating', 'comment', 'sentiment', 'sentiment_score'];
 
     public function classroomStudent()
     {
