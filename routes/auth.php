@@ -17,7 +17,6 @@ Route::post('login', [AuthenticationController::class, 'login'])->name('login');
 // ------------------ OVERALL ----------------------//
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('get-user', [AuthenticationController::class, 'userInfo'])->name('get-user'); //testing
-    Route::get('verify-user', [AuthenticationController::class, 'user'])->name('verify-user');
     Route::post('logout', [AuthenticationController::class, 'logOut'])->name('logout');
 });
 
@@ -54,7 +53,28 @@ Route::post('professor-register', [ProfessorAuthenticationController::class, 're
 
 
 Route::middleware('auth:user-api')->group(function () {
-    Route::get('hi', function () {
+    Route::get('hi-user', function () {
         return response()->json(['message' => 'Hi!']);
-    })->name('hi');
+    })->name('hi user');
+
+    // Route Checking in Next js
+    Route::get('verify-user', [AuthenticationController::class, 'user'])->name('verify-user');
+});
+
+Route::middleware('auth:admin-api')->group(function () {
+    Route::get('hi-admin', function () {
+        return response()->json(['message' => 'Hi!']);
+    })->name('hi admin');
+
+    // Route Checking in Next js
+    Route::get('verify-admin', [AuthenticationController::class, 'user'])->name('verify-user');
+});
+
+Route::middleware('auth:professor-api')->group(function () {
+    Route::get('hi-prof', function () {
+        return response()->json(['message' => 'Hi!']);
+    })->name('hi prof');
+
+    // Route Checking in Next js
+    Route::get('verify-prof', [AuthenticationController::class, 'user'])->name('verify-user');
 });

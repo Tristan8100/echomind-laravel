@@ -12,6 +12,14 @@ use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
 use Illuminate\Support\Facades\File;
 
+use Prism\Prism\Prism;
+use Prism\Prism\Enums\Provider;
+use Prism\Prism\Schema\ObjectSchema;
+use Prism\Prism\Schema\StringSchema;
+use Prism\Prism\Schema\NumberSchema;
+
+use App\Models\ClassroomStudent;
+
 class ClassroomController extends Controller
 {
     /**
@@ -180,4 +188,60 @@ class ClassroomController extends Controller
 
         return response()->json(['message' => 'Classroom deleted successfully'], 200);
     }
+
+    public function generateAiAnalysis($id)
+    {
+        // Step 1: Get classroom with evaluations
+        $classroom = Classroom::findOrFail($id);
+
+        $evaluations = ClassroomStudent::where('classroom_id', $id)
+            ->whereNotNull('comment')
+            ->whereNotNull('sentiment')
+            ->get(['comment', 'rating', 'sentiment', 'sentiment_score']);
+
+        if ($evaluations->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No student evaluations available for this classroom.'
+            ], 404);
+        }
+
+        // Step 2: Prepare evaluation content
+        $evalText = $evaluations->map(function ($e) {
+            return "Comment: {$e->comment}\nRating: {$e->rating}\nSentiment: {$e->sentiment} ({$e->sentiment_score}%)";
+        })->implode("\n\n");
+
+        // Step 3: Define schema for AI response
+        $schema = new ObjectSchema(
+            name: 'classroom_analysis',
+            description: 'AI-generated analysis and recommendations based on student evaluations',
+            properties: [
+                new StringSchema('sentiment', 'The sentiment of the evaluation: Positive, Neutral, or Negative'),
+                new StringSchema('analysis', 'Summarized analysis of evaluations'),
+                new StringSchema('recommendation', 'Actionable recommendations for the professor or class improvements'),
+            ],
+            requiredFields: ['sentiment', 'analysis', 'recommendation']
+        );
+
+        // Step 4: Send to AI via Prism
+        $response = Prism::structured()
+            ->using(Provider::Gemini, 'gemini-2.0-flash')
+            ->withSchema($schema)
+            ->withPrompt("Here are student evaluations for classroom '{$classroom->name}':\n\n{$evalText}\n\nPlease provide an overall analysis and recommendations.")
+            ->asStructured();
+
+        // Step 5: Update the Classroom with AI output
+        $classroom->update([
+            'sentiment_analysis' => $response->structured['sentiment'],
+            'ai_analysis' => $response->structured['analysis'],
+            'ai_recommendation' => $response->structured['recommendation'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $classroom,
+            'message' => 'AI analysis and recommendation generated successfully.'
+        ]);
+    }
+
 }

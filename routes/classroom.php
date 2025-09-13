@@ -13,4 +13,5 @@ Route::middleware('auth:professor-api')->group(function () {
 
 Route::middleware('auth:admin-api')->group(function () {
     Route::get('all-classrooms', [ClassroomController::class, 'index']);
+    Route::get('classrooms-generate-ai/{id}', [ClassroomController::class, 'generateAiAnalysis']);
 });

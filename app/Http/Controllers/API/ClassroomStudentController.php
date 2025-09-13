@@ -8,6 +8,12 @@ use App\Models\ClassroomStudent;
 use App\Models\Classroom;
 use Illuminate\Support\Facades\Auth;
 
+use Prism\Prism\Prism;
+use Prism\Prism\Enums\Provider;
+use Prism\Prism\Schema\ObjectSchema;
+use Prism\Prism\Schema\StringSchema;
+use Prism\Prism\Schema\NumberSchema;
+
 class ClassroomStudentController extends Controller
 {
     /**
@@ -117,6 +123,49 @@ class ClassroomStudentController extends Controller
         $classroomStudent->delete();
 
         return response()->json(['message' => 'Student removed from classroom'], 200);
+    }
+
+    public function evaluate(Request $request, $classroomId)
+    {
+        $validated = $request->validate([
+            'rating'  => 'required|integer|min:1|max:5',
+            'comment' => 'required|string',
+        ]);
+
+        $studentId = Auth::id();
+
+        // Find the enrollment record for this student in this classroom
+        $classroomStudent = ClassroomStudent::where('classroom_id', $classroomId)
+            ->where('student_id', $studentId)
+            ->firstOrFail();
+
+        // Define schema for AI response
+        $schema = new ObjectSchema(
+            name: 'professor_evaluation',
+            description: 'A structured review of user evaluation experience',
+            properties: [
+                new StringSchema('sentiment', 'The sentiment of the evaluation: Positive, Neutral, or Negative'),],
+            requiredFields: ['sentiment']
+        );
+
+        // Call AI with the student's comment
+        $response = Prism::structured()
+            ->using(Provider::Gemini, 'gemini-2.0-flash')
+            ->withSchema($schema)
+            ->withPrompt($validated['comment'])
+            ->asStructured();
+
+        // Update evaluation fields directly
+        $classroomStudent->update([
+            'rating'          => $validated['rating'],
+            'comment'         => $validated['comment'],
+            'sentiment'       => $response->structured['sentiment'],
+        ]);
+
+        return response()->json([
+            'message' => 'Evaluation saved successfully.',
+            'data'    => $classroomStudent
+        ], 200);
     }
 
     

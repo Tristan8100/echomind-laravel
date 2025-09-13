@@ -11,7 +11,7 @@ class ClassroomStudent extends Model
 
     protected $table = 'classroom_students';
 
-    protected $fillable = ['classroom_id', 'student_id'];
+    protected $fillable = ['classroom_id', 'student_id', 'rating', 'comment', 'sentiment', 'sentiment_score'];
 
     public function classroom()
     {

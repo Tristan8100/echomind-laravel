@@ -20,6 +20,9 @@ Route::middleware('auth:user-api')->group(function () {
     Route::post('/classrooms-self-enroll', [ClassroomStudentController::class, 'enroll']);
     // Get all classrooms the logged-in student is enrolled in
     Route::get('/my-classrooms', [ClassroomStudentController::class, 'myClassrooms']);
+
+    // Evaluate a classroom
+    Route::post('/classroom-students/evaluate/{id}', [ClassroomStudentController::class, 'evaluate']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {
