@@ -32,7 +32,7 @@ class ClassroomController extends Controller
         return response()->json($classrooms, 200);
     }
 
-    public function authIndex()
+    public function authIndex() 
     {
         $profId = Auth::id();
 
@@ -41,6 +41,7 @@ class ClassroomController extends Controller
         }
 
         $classrooms = Classroom::with('professor')
+            ->withCount('students') // adds students_count column
             ->where('prof_id', $profId)
             ->get();
 
