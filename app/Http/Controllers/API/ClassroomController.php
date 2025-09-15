@@ -17,7 +17,7 @@ use Prism\Prism\Enums\Provider;
 use Prism\Prism\Schema\ObjectSchema;
 use Prism\Prism\Schema\StringSchema;
 use Prism\Prism\Schema\NumberSchema;
-
+use Prism\Prism\Schema\EnumSchema;
 use App\Models\ClassroomStudent;
 
 class ClassroomController extends Controller
@@ -190,6 +190,98 @@ class ClassroomController extends Controller
         return response()->json(['message' => 'Classroom deleted successfully'], 200);
     }
 
+    public function showStudents($classroomId)
+    {
+        // Ensure the classroom belongs to the logged-in professor
+        $classroom = Classroom::where('id', $classroomId)
+            ->where('prof_id', Auth::id())
+            ->with(['students.student'])
+            ->firstOrFail();
+
+        // Map student data with name and email
+        $students = $classroom->students->map(function($cs) {
+            return [
+                'id' => $cs->student->id,
+                'name' => $cs->student->name,
+                'email' => $cs->student->email,
+            ];
+        });
+
+        return response()->json([
+            'classroom' => $classroom,
+            'students' => $students,
+        ]);
+    }
+
+    public function showEvaluations($classroomId)
+    {
+        $classroom = Classroom::where('id', $classroomId)
+            ->where('prof_id', Auth::id())
+            ->with('students') // eager load classroom_students
+            ->firstOrFail();
+
+        $evaluations = $classroom->students
+            ->filter(function ($cs) {
+                // Only include if rating or comment is not null
+                return !is_null($cs->rating) || !is_null($cs->comment);
+            })
+            ->map(function ($cs) {
+                return [
+                    'rating' => $cs->rating,
+                    'comment' => $cs->comment,
+                    'sentiment' => $cs->sentiment,
+                    'sentiment_score' => $cs->sentiment_score,
+                ];
+            });
+
+        return response()->json([
+            'classroom' => $classroom->name,
+            'evaluations' => $evaluations,
+        ]);
+    }
+
+    public function getEnrolledClassrooms(Request $request)
+    {
+        $studentId = Auth::id();
+
+        // Fetch enrollments with classroom and professor
+        $enrollments = ClassroomStudent::with(['classroom.professor'])
+            ->where('student_id', $studentId)
+            ->get();
+
+        // Map classrooms
+        $classrooms = $enrollments->map(function ($cs) {
+            return [
+                'id' => $cs->classroom->id,
+                'name' => $cs->classroom->name,
+                'subject' => $cs->classroom->subject,
+                'description' => $cs->classroom->description,
+                'image' => $cs->classroom->image,
+                'code' => $cs->classroom->code,
+                'professor' => $cs->classroom->professor
+                    ? [
+                        'id' => $cs->classroom->professor->id,
+                        'name' => $cs->classroom->professor->name,
+                        'email' => $cs->classroom->professor->email,
+                        'image' => $cs->classroom->professor->image,
+                    ]
+                    : null,
+                // Include student evaluation info
+                'evaluated' => $cs->rating !== null || $cs->comment !== null || $cs->sentiment !== null,
+                'evaluated_at' => $cs->updated_at,
+                'rating' => $cs->rating,
+                'comment' => $cs->comment,
+                'sentiment' => $cs->sentiment,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'classrooms' => $classrooms
+        ]);
+    }
+
+
     public function generateAiAnalysis($id)
     {
         // Step 1: Get classroom with evaluations
@@ -217,7 +309,11 @@ class ClassroomController extends Controller
             name: 'classroom_analysis',
             description: 'AI-generated analysis and recommendations based on student evaluations',
             properties: [
-                new StringSchema('sentiment', 'The sentiment of the evaluation: Positive, Neutral, or Negative'),
+                new EnumSchema(
+                name: 'sentiment',
+                description: 'The greatest sentiment of the evaluations: Positive, Neutral, or Negative',
+                options: ['Positive', 'Neutral', 'Negative']
+                ),
                 new StringSchema('analysis', 'Summarized analysis of evaluations'),
                 new StringSchema('recommendation', 'Actionable recommendations for the professor or class improvements'),
             ],
