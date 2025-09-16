@@ -43,6 +43,24 @@ class ClassroomController extends Controller
         $classrooms = Classroom::with('professor')
             ->withCount('students') // adds students_count column
             ->where('prof_id', $profId)
+            ->where('status', 'active')
+            ->get();
+
+        return response()->json($classrooms, 200);
+    }
+
+    public function authArchived() 
+    {
+        $profId = Auth::id();
+
+        if (!$profId) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $classrooms = Classroom::with('professor')
+            ->withCount('students')
+            ->where('prof_id', $profId)
+            ->where('status', 'archived')
             ->get();
 
         return response()->json($classrooms, 200);
@@ -281,6 +299,27 @@ class ClassroomController extends Controller
         ]);
     }
 
+    public function archiveClassroom($id)
+    {
+        $classroom = Classroom::where('id', $id)
+            ->where('prof_id', Auth::id())
+            ->firstOrFail();
+
+        $classroom->update(['status' => 'archived']);
+
+        return response()->json(['message' => 'Classroom archived successfully'], 200);
+    }
+
+    public function activateClassroom($id)
+    {
+        $classroom = Classroom::where('id', $id)
+            ->where('prof_id', Auth::id())
+            ->firstOrFail();
+
+        $classroom->update(['status' => 'active']);
+
+        return response()->json(['message' => 'Classroom archived successfully'], 200);
+    }
 
     public function generateAiAnalysis($id)
     {

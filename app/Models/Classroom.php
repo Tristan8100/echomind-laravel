@@ -21,6 +21,7 @@ class Classroom extends Model
         'sentiment_analysis',
         'ai_analysis',
         'ai_recommendation',
+        'status',
     ];
 
     public function professor()
