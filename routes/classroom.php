@@ -27,3 +27,5 @@ Route::middleware('auth:admin-api')->group(function () {
 Route::middleware('auth:user-api')->group(function () {
     Route::get('classrooms-student', [ClassroomController::class, 'getEnrolledClassrooms']);
 });
+
+Route::get('classrooms-image/{id}', [ClassroomController::class, 'getImage']); // Image generation

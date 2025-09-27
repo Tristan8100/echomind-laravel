@@ -20,6 +20,9 @@ use Prism\Prism\Schema\NumberSchema;
 use Prism\Prism\Schema\EnumSchema;
 use App\Models\ClassroomStudent;
 
+
+use Prism\Prism\ValueObjects\Media\Image;
+
 class ClassroomController extends Controller
 {
     /**
@@ -260,11 +263,18 @@ class ClassroomController extends Controller
 
     public function getEnrolledClassrooms(Request $request)
     {
+        $request->validate([
+            'status' => 'sometimes|in:active,archived',
+        ]);
+
         $studentId = Auth::id();
 
         // Fetch enrollments with classroom and professor
         $enrollments = ClassroomStudent::with(['classroom.professor'])
             ->where('student_id', $studentId)
+            ->whereHas('classroom', function ($q) use ($request) {
+                $q->where('status', $request->status ?? 'active');
+            })
             ->get();
 
         // Map classrooms
@@ -379,5 +389,39 @@ class ClassroomController extends Controller
             'message' => 'AI analysis and recommendation generated successfully.'
         ]);
     }
+
+    public function getImage($id)
+{
+    $classroom = Classroom::findOrFail($id);
+    $path = public_path($classroom->image);
+
+    if (!File::exists($path)) {
+        return response()->json(['message' => 'Image not found'], 404);
+    }
+
+    // open original file
+    $originalImage = fopen($path, 'r');
+
+    // Ask Gemini to edit the image
+    $response = Prism::image()
+        ->using(Provider::Gemini, 'gemini-2.0-flash-preview-image-generation') // image editing model
+        ->withPrompt('this is our wedding venue, I dont have an idea how to style it, perhaps you edit this venue picture to make it look like a wedding venue')
+        ->withProviderOptions([
+            'image' => $originalImage,
+            'image_mime_type' => mime_content_type($path), // detect mime type automatically
+        ])
+        ->generate();
+
+    // save new image next to original
+    $newFilename = 'edited-' . basename($classroom->image);
+    $newPath = public_path('uploads/' . $newFilename);
+
+    file_put_contents($newPath, base64_decode($response->firstImage()->base64));
+
+    return response()->json([
+        'original' => asset($classroom->image),
+        'edited'   => asset('uploads/' . $newFilename),
+    ]);
+}
 
 }
