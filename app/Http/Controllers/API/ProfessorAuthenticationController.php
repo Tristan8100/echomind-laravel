@@ -20,8 +20,8 @@ class ProfessorAuthenticationController extends Controller
     {
         try {
             $validated = $request->validate([
-                'name'     => 'required|string|min:4',
-                'email'    => [
+                'name'        => 'required|string|min:4',
+                'email'       => [
                     'required',
                     'string',
                     'email',
@@ -29,54 +29,58 @@ class ProfessorAuthenticationController extends Controller
                     function ($attribute, $value, $fail) {
                         if (
                             User::where('email', $value)->exists()
-                             || Professor::where('email', $value)->exists()
-                              || Admin::where('email', $value)->exists()
+                            || Professor::where('email', $value)->exists()
+                            || Admin::where('email', $value)->exists()
                         ) {
                             $fail('The '.$attribute.' has already been taken.');
                         }
                     },
                 ],
-                'password' => 'required|string|min:8',
+                'password'    => 'required|string|min:8',
+                'institute_id'=> 'required|exists:institutes,id', // newly added
             ]);
 
-            // Check if generated email already exists
+            // Extra check (not strictly needed since above covers it)
             if (Professor::where('email', $validated['email'])->exists()) {
                 return response()->json([
                     'response_code' => 422,
                     'status'        => 'error',
-                    'message'       => 'A user with this student number already exists.',
+                    'message'       => 'A user with this email already exists.',
                 ], 422);
             }
 
-            $user = Professor::create([
+            $professor = new Professor([
                 'name'     => $validated['name'],
                 'email'    => $validated['email'],
                 'password' => Hash::make($validated['password']),
             ]);
 
+            // newly added
+            $professor->institute()->associate($validated['institute_id']);
+            $professor->save();
+
             // Generate 6-digit OTP
             $otp = rand(100000, 999999);
 
-            // Create or update the OTP record
             EmailVerification::updateOrCreate(
-                ['email' => $user->email],
+                ['email' => $professor->email],
                 [
-                    'otp'       => $otp,
-                    'verified'  => false,
-                    'created_at'=> now(),
-                    'updated_at'=> now(),
+                    'otp'        => $otp,
+                    'verified'   => false,
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ]
             );
 
             // Send OTP email
-            Mail::raw("Your verification OTP is: $otp. It expires in 10 minutes.", function ($message) use ($user) {
-                $message->to($user->email)
+            Mail::raw("Your verification OTP is: $otp. It expires in 10 minutes.", function ($message) use ($professor) {
+                $message->to($professor->email)
                         ->subject('Email Verification OTP');
             });
 
             return response()->json([
                 'message' => 'OTP sent to your email.',
-                'email'   => $user->email
+                'email'   => $professor->email
             ]);
 
         } catch (ValidationException $e) {
@@ -96,7 +100,6 @@ class ProfessorAuthenticationController extends Controller
             ], 500);
         }
     }
-
 
     public function login(Request $request)
     {

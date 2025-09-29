@@ -15,7 +15,7 @@ class Professor extends Authenticatable
 
     protected $table = 'professors';
 
-    protected $fillable = ['name', 'email', 'password', 'image'];
+    protected $fillable = ['name', 'email', 'password', 'image', 'institute_id'];
 
     protected $hidden = ['password'];
 
@@ -28,4 +28,10 @@ class Professor extends Authenticatable
     {
         return $this->hasMany(Classroom::class, 'prof_id');
     }
+
+    public function institute()
+    {
+        return $this->belongsTo(Institute::class, 'institute_id');
+    }
+
 }

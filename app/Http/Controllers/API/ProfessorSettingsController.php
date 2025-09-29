@@ -22,6 +22,63 @@ class ProfessorSettingsController extends Controller
         return response()->json($professor);
     }
 
+    public function index(Request $request)
+    {
+        $perPage = $request->get('per_page', 10);
+        $instituteId = $request->get('institute_id');
+
+        $query = Professor::with('institute')
+            ->withCount([
+                'classrooms as active_classrooms_count' => function ($query) {
+                    $query->where('status', 'active');
+                }
+            ])
+            ->selectRaw('(SELECT AVG(rating) 
+                        FROM classroom_students 
+                        JOIN classrooms ON classrooms.id = classroom_students.classroom_id 
+                        WHERE classrooms.prof_id = professors.id) as avg_rating');
+
+        if (!empty($instituteId) && $instituteId !== 'all') {
+            $query->where('institute_id', $instituteId);
+        }
+
+        $professors = $query->paginate($perPage);
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => $professors
+        ]);
+    }
+
+    // Show a specific professor
+    public function showProf($id)
+    {
+        $professor = Professor::with([
+                'institute',
+                'classrooms' => function ($query) {
+                    $query->withCount('students'); // add student count per classroom
+                }
+            ])
+            ->withCount([
+                'classrooms as active_classrooms_count' => function ($query) {
+                    $query->where('status', 'active');
+                }
+            ])
+            ->select('professors.*')
+            ->selectRaw('(SELECT ROUND(AVG(rating),2) 
+                        FROM classroom_students 
+                        JOIN classrooms ON classrooms.id = classroom_students.classroom_id 
+                        WHERE classrooms.prof_id = professors.id) as avg_rating')
+            ->findOrFail($id);
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => $professor
+        ]);
+    }
+
+
+
     public function updateName(Request $request)
     {
         $request->validate([

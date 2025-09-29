@@ -52,6 +52,17 @@ class ClassroomController extends Controller
         return response()->json($classrooms, 200);
     }
 
+    public function authIndexAdmin($id) 
+    {
+        $classrooms = Classroom::with('professor')
+            ->withCount('students') // adds students_count column
+            ->where('prof_id', $id)
+            ->where('status', 'active')
+            ->get();
+
+        return response()->json($classrooms, 200);
+    }
+
     public function authArchived() 
     {
         $profId = Auth::id();

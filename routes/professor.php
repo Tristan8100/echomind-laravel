@@ -19,3 +19,8 @@ Route::middleware('auth:user-api')->group(function () {
    Route::patch('student-name', [StudentSettingsController::class, 'updateName']);
    Route::patch('student-password', [StudentSettingsController::class, 'updatePassword']);
 });
+
+Route::middleware('auth:sanctum')->group(function () {
+   Route::get('get-professors', [ProfessorSettingsController::class, 'index']);
+   Route::get('get-one-prof/{id}', [ProfessorSettingsController::class, 'showProf']);
+});

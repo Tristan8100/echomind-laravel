@@ -7,3 +7,4 @@ include __DIR__.'/classroom.php';
 include __DIR__.'/classroomstudent.php';
 include __DIR__.'/professor.php';
 include __DIR__.'/analytics.php';
+include __DIR__.'/institutes.php';

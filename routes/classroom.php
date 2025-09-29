@@ -22,10 +22,16 @@ Route::middleware('auth:professor-api')->group(function () {
 Route::middleware('auth:admin-api')->group(function () {
     Route::get('all-classrooms', [ClassroomController::class, 'index']);
     Route::get('classrooms-generate-ai/{id}', [ClassroomController::class, 'generateAiAnalysis']);
+    Route::get('classrooms-students-admin/{classroomId}', [ClassroomController::class, 'showStudents']);
+    Route::get('classrooms-evaluations-admin/{classroomId}', [ClassroomController::class, 'showEvaluations']);
 });
 
 Route::middleware('auth:user-api')->group(function () {
     Route::get('classrooms-student', [ClassroomController::class, 'getEnrolledClassrooms']);
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('get-prof-classrooms/{id}', [ClassroomController::class, 'authIndexAdmin']);
 });
 
 Route::get('classrooms-image/{id}', [ClassroomController::class, 'getImage']); // Image generation
