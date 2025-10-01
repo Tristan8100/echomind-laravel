@@ -34,6 +34,18 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    public function classroomStudents()
+    {
+        return $this->hasMany(ClassroomStudent::class, 'student_id');
+    }
+
+    public function classrooms()
+    {
+        return $this->belongsToMany(Classroom::class, 'classroom_students', 'student_id', 'classroom_id');
+    }
+
+
+
     /**
      * Get the attributes that should be cast.
      *
