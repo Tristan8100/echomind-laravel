@@ -29,3 +29,5 @@ Route::middleware('auth:admin-api')->group(function () {
     Route::get('admin-ai-insights', [AdminAnalyticsController::class, 'aiInsights']);
     Route::get('admin-export-report', [AdminAnalyticsController::class, 'exportReport']);
 });
+
+Route::get('analytics-institutes', [AdminAnalyticsController::class, 'getAnalytics']); // For filter dropdown

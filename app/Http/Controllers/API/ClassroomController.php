@@ -245,6 +245,28 @@ class ClassroomController extends Controller
         ]);
     }
 
+    public function showStudentsAdmin($classroomId)
+    {
+        // Ensure the classroom belongs to the logged-in professor
+        $classroom = Classroom::where('id', $classroomId) // no prof_id check for admin
+            ->with(['students.student']) 
+            ->firstOrFail();
+
+        // Map student data with name and email
+        $students = $classroom->students->map(function($cs) {
+            return [
+                'id' => $cs->student->id,
+                'name' => $cs->student->name,
+                'email' => $cs->student->email,
+            ];
+        });
+
+        return response()->json([
+            'classroom' => $classroom,
+            'students' => $students,
+        ]);
+    }
+
     public function showEvaluations($classroomId)
     {
         $classroom = Classroom::where('id', $classroomId)
@@ -271,6 +293,36 @@ class ClassroomController extends Controller
             'evaluations' => $evaluations,
         ]);
     }
+
+    public function showEvaluationsAdmin($classroomId)
+    {
+        $classroom = Classroom::where('id', $classroomId)
+            ->with(['students.student']) // eager load the user for each classroom_student
+            ->firstOrFail();
+
+        $evaluations = $classroom->students
+            ->filter(function ($cs) {
+                return !is_null($cs->rating) || !is_null($cs->comment);
+            })
+            ->map(function ($cs) {
+                return [
+                    'student_name' => $cs->student?->name,
+                    'student_email' => $cs->student?->email,
+                    'student_id' => $cs->student?->id,
+                    'rating' => $cs->rating,
+                    'comment' => $cs->comment,
+                    'sentiment' => $cs->sentiment,
+                    'sentiment_score' => $cs->sentiment_score,
+                ];
+            })
+            ->values(); // reindex array
+
+        return response()->json([
+            'classroom' => $classroom->name,
+            'evaluations' => $evaluations,
+        ]);
+    }
+
 
     public function getEnrolledClassrooms(Request $request)
     {

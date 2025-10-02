@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Classroom;
 use App\Models\ClassroomStudent;
 use Carbon\Carbon;
+use App\Models\Institute;
 
 class AdminAnalyticsController extends Controller
 {
@@ -504,5 +505,128 @@ class AdminAnalyticsController extends Controller
         ];
 
         return response()->json($report);
+    }
+
+    public function getAnalytics(Request $request)
+    {
+        $instituteId = $request->input('institute_id');
+
+        // Professors (with active classrooms only)
+        $professors = Professor::with([
+            'classrooms' => function ($q) {
+                $q->where('status', 'active');
+            },
+            'classrooms.students'
+        ])
+        ->when($instituteId, function ($query) use ($instituteId) {
+            $query->where('institute_id', $instituteId);
+        })
+        ->get();
+
+        // Active classrooms
+        $classrooms = Classroom::with('students')
+            ->where('status', 'active')
+            ->when($instituteId, function ($query) use ($instituteId, $professors) {
+                $query->whereIn('prof_id', $professors->pluck('id'));
+            })
+            ->get();
+
+        // Archived classrooms count (system-wide or institute filtered)
+        $archivedClassroomsCount = Classroom::where('status', 'archived')
+            ->when($instituteId, function ($query) use ($instituteId) {
+                $query->whereIn('prof_id', Professor::where('institute_id', $instituteId)->pluck('id'));
+            })
+            ->count();
+
+        // Unique students (no duplicates across classrooms)
+        $uniqueStudents = $classrooms->flatMap->students->pluck('student_id')->unique()->count();
+
+        // Total enrolled (students can repeat across classrooms)
+        $totalEnrolled = $classrooms->flatMap->students->count();
+
+        // Feedbacks & ratings
+        $allFeedbacks = ClassroomStudent::whereIn('classroom_id', $classrooms->pluck('id'))->get();
+        $ratings = $allFeedbacks->pluck('rating')->filter();
+        $avgRating = $ratings->avg() ?? 0;
+        $totalFeedbacks = $ratings->count();
+        $completionRate = $totalEnrolled > 0 ? round(($totalFeedbacks / $totalEnrolled) * 100, 2) : 0;
+
+        // Sentiment analytics
+        $avgSentiment = $allFeedbacks->pluck('sentiment_score')->avg() ?? 0;
+        $positive = $allFeedbacks->where('sentiment', 'positive')->count();
+        $neutral = $allFeedbacks->where('sentiment', 'neutral')->count();
+        $negative = $allFeedbacks->where('sentiment', 'negative')->count();
+        $totalSentiments = max(($positive + $neutral + $negative), 1);
+
+        // Professor stats
+        $professorStats = $professors->map(function ($prof) {
+            $enrollments = $prof->classrooms->flatMap->students;
+            $ratings = $enrollments->pluck('rating')->filter();
+            $feedbacks = $ratings->count();
+            $enrolled = $enrollments->count();
+            $completion = $enrolled > 0 ? ($feedbacks / $enrolled) * 100 : 0;
+
+            return [
+                'id' => $prof->id,
+                'name' => $prof->name,
+                'avg_rating' => $ratings->avg() ?? 0,
+                'completion_rate' => round($completion, 2),
+            ];
+        });
+
+        $topProfessors = $professorStats->sortByDesc('avg_rating')->take(3)->values();
+        $lowestProfessors = $professorStats->sortBy('avg_rating')->take(3)->values();
+
+        // Classroom stats
+        $classroomStats = $classrooms->map(function ($c) {
+            $enrollments = ClassroomStudent::where('classroom_id', $c->id)->get();
+            $ratings = $enrollments->pluck('rating')->filter();
+            $feedbacks = $ratings->count();
+            $enrolled = $enrollments->count();
+            $completion = $enrolled > 0 ? ($feedbacks / $enrolled) * 100 : 0;
+
+            return [
+                'id' => $c->id,
+                'name' => $c->name,
+                'avg_rating' => $ratings->avg() ?? 0,
+                'completion_rate' => round($completion, 2),
+            ];
+        });
+
+        $topClassrooms = $classroomStats->sortByDesc('avg_rating')->take(3)->values();
+        $lowestClassrooms = $classroomStats->sortBy('avg_rating')->take(3)->values();
+
+        // Response
+        return response()->json([
+            'institute' => [
+                'id' => $instituteId ?? null,
+                'name' => $instituteId ? optional($professors->first()->institute)->name : 'System-wide',
+            ],
+            'totals' => [
+                'professors' => $professors->count(),
+                'classrooms_active' => $classrooms->count(),
+                'classrooms_archived' => $archivedClassroomsCount,
+                'students_total' => $uniqueStudents,
+                'students_enrolled' => $totalEnrolled,
+            ],
+            'feedback' => [
+                'total_feedbacks' => $totalFeedbacks,
+                'completion_rate' => $completionRate,
+            ],
+            'ratings' => [
+                'average_rating' => round($avgRating, 2),
+            ],
+            'sentiment' => [
+                'positive_percentage' => round(($positive / $totalSentiments) * 100, 2),
+                'neutral_percentage' => round(($neutral / $totalSentiments) * 100, 2),
+                'negative_percentage' => round(($negative / $totalSentiments) * 100, 2),
+            ],
+            'highlights' => [
+                'top_professors' => $topProfessors,
+                'lowest_professors' => $lowestProfessors,
+                'top_classrooms' => $topClassrooms,
+                'lowest_classrooms' => $lowestClassrooms,
+            ]
+        ]);
     }
 }
