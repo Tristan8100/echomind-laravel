@@ -31,3 +31,7 @@ Route::middleware('auth:admin-api')->group(function () {
 });
 
 Route::get('analytics-institutes', [AdminAnalyticsController::class, 'getAnalytics']); // For filter dropdown
+
+Route::middleware('auth:user-api')->group(function () {
+    Route::get('student-analytics', [AnalyticsController::class, 'studentAnalytics']);
+});

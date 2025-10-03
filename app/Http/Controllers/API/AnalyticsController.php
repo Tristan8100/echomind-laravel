@@ -7,6 +7,9 @@ use Illuminate\Http\Request;
 use App\Models\Classroom;
 use App\Models\ClassroomStudent;
 use Carbon\Carbon;
+use Illuminate\Container\Attributes\Auth;
+use Illuminate\Support\Facades\Auth as FacadesAuth;
+use App\Models\User;
 
 class AnalyticsController extends Controller
 {
@@ -248,4 +251,82 @@ class AnalyticsController extends Controller
 
         return response()->json($ratingDistribution);
     }
+
+    public function studentAnalytics(Request $request)
+    {
+        $student = User::findOrFail(auth('user-api')->id());
+
+        $classroomData = ClassroomStudent::with('classroom:id,name,status')
+            ->where('student_id', $student->id)
+            ->whereHas('classroom', function($q) {
+                $q->where('status', 'active');
+            })
+            ->get();
+
+        $notEvaluated = $classroomData->filter(fn($c) => is_null($c->rating) && is_null($c->sentiment));
+        $commentsCount = $classroomData->filter(fn($c) => !is_null($c->comment))->count();
+        $ratingsCount = $classroomData->filter(fn($c) => !is_null($c->rating))->count();
+        $averageRating = $ratingsCount > 0 ? $classroomData->whereNotNull('rating')->avg('rating') : null;
+
+        // Sentiment distribution
+        $sentiments = $classroomData
+            ->filter(fn($c) => !is_null($c->sentiment))
+            ->groupBy('sentiment')
+            ->map(fn($group, $key) => [
+                'sentiment' => $key,
+                'total' => $group->count(),
+            ])
+            ->values();
+
+        $lastActivity = $classroomData->sortByDesc('created_at')->first();
+
+        return response()->json([
+            'student' => [
+                'id' => $student->id,
+                'name' => $student->name,
+                'email' => $student->email,
+            ],
+
+            'classrooms' => [
+                'total_joined' => $classroomData->count(),
+                'list' => $classroomData->map(fn($c) => [
+                    'classroom_id' => $c->classroom_id,
+                    'rating' => $c->rating,
+                    'comment' => $c->comment,
+                    'sentiment' => $c->sentiment,
+                    'sentiment_score' => $c->sentiment_score,
+                    'classroom' => $c->classroom,
+                ]),
+            ],
+
+            'ratings' => [
+                'average_rating' => $averageRating,
+                'ratings_count' => $ratingsCount,
+            ],
+
+            'sentiments' => $sentiments,
+
+            'engagement' => [
+                'comments_count' => $commentsCount,
+                'last_activity' => $lastActivity,
+            ],
+
+            'warnings' => [
+                'not_evaluated_classrooms' => $notEvaluated->map(fn($row) => [
+                    'classroom_id' => $row->classroom_id,
+                    'classroom_name' => $row->classroom->name,
+                ]),
+                'count' => $notEvaluated->count(),
+            ],
+
+            'progress' => [
+                'evaluated' => $ratingsCount,
+                'pending' => $notEvaluated->count(),
+                'completion_rate' => $classroomData->count() > 0
+                    ? round(($ratingsCount / $classroomData->count()) * 100, 2)
+                    : 0,
+            ],
+        ]);
+    }
+
 }

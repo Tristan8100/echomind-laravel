@@ -70,4 +70,33 @@ class AdminAuthenticationController extends Controller
             'success' => true,
         ]);
     }
+
+    public function register(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:admins',
+            'password' => 'required|string|min:8',
+        ]);
+
+        // Create the admin user
+        $admin = Admin::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+        ]);
+
+        // Delete the token after successful registration
+     
+        return response()->json([
+            'response_code' => 201,
+            'status' => 'success',
+            'message' => 'Admin registered successfully.',
+            'admin' => [
+                'id' => $admin->id,
+                'name' => $admin->name,
+                'email' => $admin->email,
+            ]
+        ], 201);
+    }
 }
