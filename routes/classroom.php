@@ -7,9 +7,9 @@ use App\Http\Controllers\API\ClassroomController;
 Route::middleware('auth:professor-api')->group(function () {
     Route::get('classrooms', [ClassroomController::class, 'authIndex']);
     Route::get('classrooms-archived', [ClassroomController::class, 'authArchived']);
-    Route::post('classrooms', [ClassroomController::class, 'store']);
-    Route::post('classrooms-update/{id}', [ClassroomController::class, 'update']); // Using POST for update because PUT never works with form-data
-    Route::delete('classrooms/{id}', [ClassroomController::class, 'destroy']);
+    Route::post('classrooms', [ClassroomController::class, 'store']); // MODIFIED FOR CLOUDINARY
+    Route::post('classrooms-update/{id}', [ClassroomController::class, 'update']); // Using POST for update because PUT never works with form-data --- MODIFIED FOR CLOUDINARY
+    Route::delete('classrooms/{id}', [ClassroomController::class, 'destroy']); // MODIFIED FOR CLOUDINARY
 
     Route::get('classrooms-students/{classroomId}', [ClassroomController::class, 'showStudents']);
     Route::get('classrooms-evaluations/{classroomId}', [ClassroomController::class, 'showEvaluations']);

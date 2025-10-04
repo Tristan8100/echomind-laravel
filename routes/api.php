@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
+use Cloudinary\Cloudinary;
 
 include __DIR__.'/auth.php';
 include __DIR__.'/classroom.php';
@@ -12,3 +14,22 @@ include __DIR__.'/students.php';
 include __DIR__.'/chatbot.php';
 
 Route::post('add-admin', [\App\Http\Controllers\API\AdminAuthenticationController::class, 'register']); //temporary
+
+Route::post('/upload-image', function (Request $request) {
+    $request->validate(['image' => 'required|image']);
+
+    $cloudinary = new Cloudinary();
+
+    $uploadResult = $cloudinary->uploadApi()->upload($request->file('image')->getRealPath());
+
+    // Create URL with f_auto,q_auto transformations
+    $optimizedUrl = $cloudinary->image($uploadResult['public_id'])
+                              ->format('auto')
+                              ->quality('auto')
+                              ->toUrl();
+
+    return response()->json([
+        'original_url' => $uploadResult['secure_url'],
+        'optimized_url' => $optimizedUrl,
+    ]);
+});

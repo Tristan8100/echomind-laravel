@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Classroom;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
@@ -19,6 +20,8 @@ use Prism\Prism\Schema\StringSchema;
 use Prism\Prism\Schema\NumberSchema;
 use Prism\Prism\Schema\EnumSchema;
 use App\Models\ClassroomStudent;
+
+use Cloudinary\Cloudinary;
 
 
 use Prism\Prism\ValueObjects\Media\Image;
@@ -81,7 +84,7 @@ class ClassroomController extends Controller
     }
     
     /**
-     * Store a newly created classroom.
+     * Store a newly created classroom. // MODIFIED FOR CLOUDINARY
      */
     public function store(Request $request)
     {
@@ -89,34 +92,30 @@ class ClassroomController extends Controller
             'name'        => 'required|string|max:255',
             'subject'     => 'required|string|max:255',
             'description' => 'nullable|string',
-            'image'       => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'image'       => 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:2048',
         ]);
 
         $validated['prof_id'] = Auth::id();
 
-        // Handle image upload with Intervention Image
+        $imagePath = null;
+
         if ($request->hasFile('image')) {
             $manager = new ImageManager(new Driver());
+            $image = $manager->read($request->file('image')->getRealPath())
+                            ->resize(800, 800, function ($constraint) {
+                                $constraint->aspectRatio();
+                                $constraint->upsize();
+                            })
+                            ->toJpeg();
 
-            // Read and optimize image
-            $image = $manager->read($request->file('image'))
-                ->resize(800, null, function ($constraint) {
-                    $constraint->aspectRatio();
-                    $constraint->upsize();
-                })
-                ->toJpeg(80); // Save as JPEG with 80% quality
+            $cloudinary = new Cloudinary();
+            $upload = $cloudinary->uploadApi()->upload($image->toDataUri(), [
+                'folder' => 'echomind/classroom',
+                'public_id' => 'classroom_' . Str::uuid(),
+                'overwrite' => true,
+            ]);
 
-            // Generate filename and ensure directory
-            $filename = 'classroom-' . Str::slug($request->name) . '-' . time() . '.jpg';
-            $uploadPath = public_path('uploads/classrooms');
-            File::ensureDirectoryExists($uploadPath);
-            $imagePath = $uploadPath . '/' . $filename;
-
-            // Save optimized image
-            $image->save($imagePath);
-
-            // Store relative path in DB
-            $validated['image'] = '/uploads/classrooms/' . $filename;
+            $imagePath = $upload['secure_url'];
         }
 
         // Generate a unique classroom code
@@ -125,6 +124,7 @@ class ClassroomController extends Controller
         } while (Classroom::where('code', $code)->exists());
 
         $validated['code'] = $code;
+        $validated['image'] = $imagePath;
 
         $classroom = Classroom::create($validated);
 
@@ -146,7 +146,7 @@ class ClassroomController extends Controller
     }
 
     /**
-     * Update the specified classroom.
+     * Update the specified classroom. // MODIFIED FOR CLOUDINARY
      */
     public function update(Request $request, $id)
     {
@@ -160,49 +160,52 @@ class ClassroomController extends Controller
             'name'        => 'sometimes|required|string|max:255',
             'subject'     => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
-            'image'       => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'image'       => 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:2048',
         ]);
 
-        // Always enforce professor ownership
         $validated['prof_id'] = Auth::id();
 
-        // Handle image upload with Intervention Image
         if ($request->hasFile('image')) {
-            $manager = new ImageManager(new Driver());
-
-            // Read and optimize image
-            $image = $manager->read($request->file('image'))
-                ->resize(800, null, function ($constraint) {
-                    $constraint->aspectRatio();
-                    $constraint->upsize();
-                })
-                ->toJpeg(80); // Save as JPEG with 80% quality
-
-            // Generate filename and ensure directory
-            $filename = 'classroom-' . Str::slug($request->name ?? $classroom->name) . '-' . time() . '.jpg';
-            $uploadPath = public_path('uploads/classrooms');
-            File::ensureDirectoryExists($uploadPath);
-            $imagePath = $uploadPath . '/' . $filename;
-
-            // Save optimized image
-            $image->save($imagePath);
-
-            // Delete old image if exists
-            if ($classroom->image && File::exists(public_path($classroom->image))) {
-                File::delete(public_path($classroom->image));
+            // Delete old Cloudinary image if exists
+            if ($classroom->image && str_starts_with($classroom->image, 'https://res.cloudinary.com')) {
+                try {
+                    $publicId = pathinfo(parse_url($classroom->image, PHP_URL_PATH), PATHINFO_FILENAME);
+                    (new Cloudinary())->uploadApi()->destroy('echomind/classroom/' . $publicId);
+                } catch (\Exception $e) {
+                    Log::error("Failed to delete old classroom image {$classroom->id}: " . $e->getMessage());
+                }
             }
 
-            // Store relative path in DB
-            $validated['image'] = '/uploads/classrooms/' . $filename;
+            // Upload new one
+            $manager = new ImageManager(new Driver());
+            $image = $manager->read($request->file('image')->getRealPath())
+                            ->resize(800, 800, function ($constraint) {
+                                $constraint->aspectRatio();
+                                $constraint->upsize();
+                            })
+                            ->toJpeg();
+
+            $cloudinary = new Cloudinary();
+            $upload = $cloudinary->uploadApi()->upload($image->toDataUri(), [
+                'folder' => 'echomind/classroom',
+                'public_id' => 'classroom_' . $classroom->id . '_' . time(),
+                'overwrite' => true,
+            ]);
+
+            $validated['image'] = $upload['secure_url'];
         }
 
         $classroom->update($validated);
 
-        return response()->json($classroom, 200);
+        return response()->json([
+            'message' => 'Classroom updated successfully.',
+            'classroom' => $classroom,
+        ], 200);
     }
 
+
     /**
-     * Remove the specified classroom.
+     * Remove the specified classroom. // MODIFIED FOR CLOUDINARY
      */
     public function destroy($id)
     {
@@ -212,9 +215,13 @@ class ClassroomController extends Controller
             return response()->json(['message' => 'Classroom not found'], 404);
         }
 
-        // Delete image file if it exists
-        if ($classroom->image && File::exists(public_path($classroom->image))) {
-            File::delete(public_path($classroom->image));
+        if ($classroom->image && str_starts_with($classroom->image, 'https://res.cloudinary.com')) {
+            try {
+                $publicId = pathinfo(parse_url($classroom->image, PHP_URL_PATH), PATHINFO_FILENAME);
+                (new Cloudinary())->uploadApi()->destroy('echomind/classroom/' . $publicId);
+            } catch (\Exception $e) {
+                Log::error("Failed to delete Cloudinary image for classroom {$classroom->id}: " . $e->getMessage());
+            }
         }
 
         $classroom->delete();
