@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Cloudinary\Cloudinary;
+use Prism\Prism\Prism;
+use Prism\Prism\Enums\Provider;
 
 include __DIR__.'/auth.php';
 include __DIR__.'/classroom.php';
@@ -32,4 +34,16 @@ Route::post('/upload-image', function (Request $request) {
         'original_url' => $uploadResult['secure_url'],
         'optimized_url' => $optimizedUrl,
     ]);
+});
+
+Route::post('/try-ai', function (Request $request) {
+    
+    $response = Prism::text()
+    ->using(Provider::OpenRouter, 'tngtech/deepseek-r1t2-chimera:free')
+    ->withPrompt('Tell me a story about AI.')
+    ->asText();
+    
+
+
+    return response()->json(['response' => $response->text]);
 });
