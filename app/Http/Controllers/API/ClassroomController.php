@@ -274,6 +274,35 @@ class ClassroomController extends Controller
         ]);
     }
 
+    public function showStudentsData($classroomId)
+    {
+        // Fetch classroom (admin view, no prof_id check)
+        $classroom = Classroom::where('id', $classroomId)
+            ->with(['students.student'])
+            ->firstOrFail();
+
+        // Map students (id, name, email)
+        $students = $classroom->students->map(function ($cs) {
+            return [
+                'id' => $cs->student->id,
+                'name' => $cs->student->name,
+                'email' => $cs->student->email,
+            ];
+        });
+
+
+        $currentStudentId = Auth::id();
+        $isStudentInClassroom = $classroom->students->contains(function ($cs) use ($currentStudentId) {
+            return $cs->student_id === $currentStudentId;
+        });
+
+        return response()->json([
+            'classroom' => $classroom,
+            'students' => $students,
+            'is_student_in_classroom' => $isStudentInClassroom,
+        ]);
+    }
+
     public function showEvaluations($classroomId)
     {
         $classroom = Classroom::where('id', $classroomId)
@@ -404,7 +433,10 @@ class ClassroomController extends Controller
     public function generateAiAnalysis($id)
     {
         // Step 1: Get classroom with evaluations
-        $classroom = Classroom::findOrFail($id);
+        $classroom = Classroom::where('id', $id)
+            ->where('prof_id', Auth::id())
+            ->with('students') // eager load classroom_students
+            ->firstOrFail();
 
         $evaluations = ClassroomStudent::where('classroom_id', $id)
             ->whereNotNull('comment')
