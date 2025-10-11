@@ -111,10 +111,10 @@ class AuthenticationController extends Controller
             
             if (!$user->email_verified_at) {
                 return response()->json([
-                    'response_code' => 401,
+                    'response_code' => 403,
                     'status'        => 'error',
                     'message'       => 'Email not verified',
-                ], 401);
+                ], 403);
             }
             $user->tokens()->delete();
             $token = $user->createToken('admin-auth-token')->plainTextToken;

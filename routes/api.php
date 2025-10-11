@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Cloudinary\Cloudinary;
 use Prism\Prism\Prism;
 use Prism\Prism\Enums\Provider;
@@ -46,4 +47,35 @@ Route::post('/try-ai', function (Request $request) {
 
 
     return response()->json(['response' => $response->text]);
+});
+
+Route::post('add-student', function (Request $request) {
+    $request->validate([
+        'name'           => 'required|string|min:4',
+        'student_number' => 'required|string|max:255',
+        'password'       => 'required|string|min:8',
+    ]);
+
+    $generatedEmail = $request->student_number . '@btech.ph.education';
+
+    if (\App\Models\User::where('email', $generatedEmail)->exists()) {
+        return response()->json([
+            'response_code' => 422,
+            'status'        => 'error',
+            'message'       => 'A user with this student number already exists.',
+        ], 422);
+    }
+
+    $user = \App\Models\User::create([
+        'name'     => $request->name,
+        'email'    => $generatedEmail,
+        'password' => Hash::make($request->password),
+    ]);
+
+    return response()->json([
+        'response_code' => 201,
+        'status'        => 'success',
+        'message'       => 'Student added successfully.',
+        'data'          => $user,
+    ], 201);
 });

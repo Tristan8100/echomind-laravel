@@ -120,10 +120,10 @@ class ProfessorAuthenticationController extends Controller
 
         if (!$professor->email_verified_at) {
             return response()->json([
-                'response_code' => 401,
+                'response_code' => 403,
                 'status'        => 'error',
                 'message'       => 'Email not verified',
-            ], 401);
+            ], 403);
         }
 
         // Delete old tokens & create new token
