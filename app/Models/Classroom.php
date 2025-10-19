@@ -22,6 +22,7 @@ class Classroom extends Model
         'ai_analysis',
         'ai_recommendation',
         'status',
+        'survey_id',
     ];
 
     public function professor()
@@ -33,5 +34,11 @@ class Classroom extends Model
     {
         return $this->hasMany(ClassroomStudent::class);
     }
+
+    public function survey()
+    {
+        return $this->belongsTo(Survey::class, 'survey_id');
+    }
+
 }
 
