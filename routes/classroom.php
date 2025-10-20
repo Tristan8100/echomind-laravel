@@ -29,6 +29,7 @@ Route::middleware('auth:admin-api')->group(function () {
 Route::middleware('auth:user-api')->group(function () {
     Route::get('classrooms-student', [ClassroomController::class, 'getEnrolledClassrooms']);
     Route::get('get-classroom-data/{classroomId}', [ClassroomController::class, 'showStudentsData']);
+    Route::get('check-if-enrolled/{classroomId}', [ClassroomController::class, 'checkIfEnrolled']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {

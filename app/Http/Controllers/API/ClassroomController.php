@@ -302,6 +302,30 @@ class ClassroomController extends Controller
             'is_student_in_classroom' => $isStudentInClassroom,
         ]);
     }
+    
+    public function checkifEnrolled($classroomId)
+    {
+        // Fetch classroom (admin view, no prof_id check)
+        $classroom = Classroom::where('id', $classroomId)
+            ->with(['students.student'])
+            ->firstOrFail();
+
+
+        $currentStudentId = Auth::id();
+        $isStudentInClassroom = $classroom->students->contains(function ($cs) use ($currentStudentId) {
+            return $cs->student_id === $currentStudentId;
+        });
+
+        if (!$isStudentInClassroom) {
+            return response()->json([
+                'message' => 'You are not enrolled in this classroom',
+            ], 422);
+        }
+
+        return response()->json([
+            'classroom' => $classroom,
+        ]);
+    }
 
     public function showEvaluations($classroomId)
     {

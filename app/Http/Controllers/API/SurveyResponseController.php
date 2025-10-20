@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\SurveyResponse;
 use Illuminate\Support\Facades\Auth;
+use App\Models\ClassroomStudent;
+use App\Models\Classroom;
+use App\Models\SurveyQuestion;
 
 class SurveyResponseController extends Controller
 {
@@ -19,25 +22,63 @@ class SurveyResponseController extends Controller
             'responses.*.rating' => 'required|integer|min:1|max:5',
         ]);
 
-        $inserted = [];
+        $studentId = Auth::id();
+
+        // Check if user is enrolled
+        if (!ClassroomStudent::where('classroom_id', $data['classroom_id'])
+            ->where('student_id', $studentId)
+            ->exists()
+        ) {
+            return response()->json([
+                'message' => 'You are not enrolled in this classroom',
+            ], 422);
+        }
+
+        // Get survey_id of the classroom
+        $classroom = Classroom::findOrFail($data['classroom_id']);
+        if (!$classroom->survey_id) {
+            return response()->json([
+                'message' => 'No survey assigned to this classroom',
+            ], 422);
+        }
+
+        // Get all question IDs for this survey
+        $surveyQuestionIds = SurveyQuestion::whereIn('section_id', function($q) use ($classroom) {
+            $q->select('id')
+            ->from('survey_sections')
+            ->where('survey_id', $classroom->survey_id);
+        })->pluck('id')->toArray();
+
+        // Check if all questions are answered
+        $submittedQuestionIds = collect($data['responses'])->pluck('survey_question_id')->toArray();
+        $missing = array_diff($surveyQuestionIds, $submittedQuestionIds);
+
+        if (!empty($missing)) {
+            return response()->json([
+                'message' => 'You must answer all questions',
+                'missing_question_ids' => $missing
+            ], 422);
+        }
+
+        // Save responses
         foreach ($data['responses'] as $response) {
-        SurveyResponse::updateOrCreate(
-            [
-                'classroom_id' => $data['classroom_id'],
-                'student_id' => Auth::id(),
-                'survey_question_id' => $response['survey_question_id'],
-            ],
-            [
-                'rating' => $response['rating'],
-            ]
-        );
-    }
+            SurveyResponse::updateOrCreate(
+                [
+                    'classroom_id' => $data['classroom_id'],
+                    'student_id' => $studentId,
+                    'survey_question_id' => $response['survey_question_id'],
+                ],
+                [
+                    'rating' => $response['rating'],
+                ]
+            );
+        }
 
         return response()->json([
             'message' => 'Responses submitted successfully',
-            'data' => $inserted,
         ], 201);
     }
+
 
     public function index($classroomId)
     {
