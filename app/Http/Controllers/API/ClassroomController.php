@@ -307,7 +307,7 @@ class ClassroomController extends Controller
     {
         // Fetch classroom (admin view, no prof_id check)
         $classroom = Classroom::where('id', $classroomId)
-            ->with(['students.student'])
+            ->with(['students.student', 'professor'])
             ->firstOrFail();
 
 

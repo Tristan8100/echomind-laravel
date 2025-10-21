@@ -131,6 +131,10 @@ class SurveyController extends Controller
 
         $survey = $classroom->survey;
 
+        $totalRespondents = SurveyResponse::where('classroom_id', $classroom->id)
+        ->distinct('student_id')
+        ->count('student_id');
+
         // Load sections and questions
         $sections = $survey->sections->map(function ($section) use ($classroom) {
             $section->questions = $section->questions->map(function ($question) use ($classroom) {
@@ -163,6 +167,8 @@ class SurveyController extends Controller
 
         return response()->json([
             'classroom_id' => $classroom->id,
+            'classroom_name' => $classroom->name,
+            'total_respondents' => $totalRespondents,
             'survey' => [
                 'id' => $survey->id,
                 'title' => $survey->title,

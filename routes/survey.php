@@ -11,6 +11,8 @@ use App\Models\Survey;
 Route::middleware('auth:professor-api')->group(function () {
     //for professor to assign survey to their classroom
     Route::post('/surveys-assign/{id}', [SurveyController::class, 'assignSurvey']);
+
+    Route::get('/classrooms/{id}/survey-report', [SurveyController::class, 'getSurveyWithResponses']);
 });
 
 Route::middleware('auth:user-api')->group(function () {
@@ -41,7 +43,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/surveys', [SurveyController::class, 'index2']);
     Route::get('/surveys/{id}', [SurveyController::class, 'show']);
     Route::get('/classrooms/{id}/check-survey', [SurveyController::class, 'checkSurvey']);
-    Route::get('/classrooms/{id}/survey-report', [SurveyController::class, 'getSurveyWithResponses']);
+    //Route::get('/classrooms/{id}/survey-report', [SurveyController::class, 'getSurveyWithResponses']);
 
 
 
