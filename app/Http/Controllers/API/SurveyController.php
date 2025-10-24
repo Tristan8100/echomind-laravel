@@ -19,7 +19,7 @@ class SurveyController extends Controller
 
     public function index2()
     {
-        $surveys = Survey::where('status', 'active')->get();
+        $surveys = Survey::all();
         return response()->json($surveys);
     }
 
