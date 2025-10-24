@@ -19,7 +19,7 @@ class SurveyController extends Controller
 
     public function index2()
     {
-        $surveys = Survey::all();
+        $surveys = Survey::with('sections.questions')->orderByDesc('created_at')->get();
         return response()->json($surveys);
     }
 
