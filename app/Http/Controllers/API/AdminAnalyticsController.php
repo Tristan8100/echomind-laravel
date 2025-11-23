@@ -596,11 +596,16 @@ class AdminAnalyticsController extends Controller
         $topClassrooms = $classroomStats->sortByDesc('avg_rating')->take(3)->values();
         $lowestClassrooms = $classroomStats->sortBy('avg_rating')->take(3)->values();
 
+        $instituteName = $instituteId
+            ? Institute::find($instituteId)?->name ?? 'Unknown Institute'
+            : 'System-wide';
+
+
         // Response
         return response()->json([
             'institute' => [
                 'id' => $instituteId ?? null,
-                'name' => $instituteId ? optional($professors->first()->institute)->name : 'System-wide',
+                'name' => $instituteName, // Don't get name from first prof!!
             ],
             'totals' => [
                 'professors' => $professors->count(),
