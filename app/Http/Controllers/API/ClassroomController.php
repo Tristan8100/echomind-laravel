@@ -497,7 +497,7 @@ class ClassroomController extends Controller
 
         // Step 4: Send to AI via Prism
         $response = Prism::structured()
-            ->using(Provider::Gemini, 'gemini-2.0-flash')
+            ->using(Provider::Gemini, 'gemini-2.5-flash-lite')//gemini-2.0-flash not working
             ->withSchema($schema)
             ->withPrompt("Here are student evaluations for classroom '{$classroom->name}':\n\n{$evalText}\n\nPlease provide an overall analysis and recommendations.")
             ->asStructured();

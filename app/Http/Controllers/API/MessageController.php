@@ -125,7 +125,7 @@ class MessageController extends Controller
 
         try {
             $responseAI = Prism::text()
-                ->using(Provider::Gemini, 'gemini-2.0-flash')
+                ->using(Provider::Gemini, 'gemini-2.5-flash-lite') //gemini-2.0-flash not working
                 ->withSystemPrompt('You are a friendly assistant for professors. Always address the professor by name and be helpful.')
                 ->withMessages([
                     ...$structuredMessages,

@@ -12,5 +12,5 @@ Route::middleware('auth:professor-api')->group(function () {
     Route::put('/conversations/{id}', [ConversationController::class, 'updateConversation']);
     Route::delete('/conversations/{id}', [ConversationController::class, 'deleteConversation']);
 
-    Route::post('/messages/{id}', [MessageController::class, 'sendMessage']);
+    Route::post('/messages/{id}', [MessageController::class, 'sendMessage']); //CHANGED AI MODEL
 });

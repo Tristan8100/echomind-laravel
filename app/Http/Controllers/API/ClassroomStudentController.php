@@ -150,7 +150,7 @@ class ClassroomStudentController extends Controller
 
         // Call AI with the student's comment
         $response = Prism::structured()
-            ->using(Provider::Gemini, 'gemini-2.0-flash')
+            ->using(Provider::Gemini, 'gemini-2.5-flash-lite')//gemini-2.0-flash not working
             ->withSchema($schema)
             ->withPrompt($validated['comment'])
             ->asStructured();

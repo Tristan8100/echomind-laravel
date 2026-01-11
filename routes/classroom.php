@@ -13,7 +13,7 @@ Route::middleware('auth:professor-api')->group(function () {
 
     Route::get('classrooms-students/{classroomId}', [ClassroomController::class, 'showStudents']);
     Route::get('classrooms-evaluations/{classroomId}', [ClassroomController::class, 'showEvaluations']);
-    Route::get('classrooms-generate-ai-prof/{id}', [ClassroomController::class, 'generateAiAnalysis']);
+    Route::get('classrooms-generate-ai-prof/{id}', [ClassroomController::class, 'generateAiAnalysis']); //CHANGED AI MODEL
 
     Route::post('classrooms-archive/{id}', [ClassroomController::class, 'archiveClassroom']);
     Route::post('classrooms-activate/{id}', [ClassroomController::class, 'activateClassroom']);
@@ -21,7 +21,7 @@ Route::middleware('auth:professor-api')->group(function () {
 
 Route::middleware('auth:admin-api')->group(function () {
     Route::get('all-classrooms', [ClassroomController::class, 'index']);
-    Route::get('classrooms-generate-ai/{id}', [ClassroomController::class, 'generateAiAnalysis']);
+    Route::get('classrooms-generate-ai/{id}', [ClassroomController::class, 'generateAiAnalysis']); //CHANGED AI MODEL
     Route::get('classrooms-students-admin/{classroomId}', [ClassroomController::class, 'showStudentsAdmin']); //MODIFIED
     Route::get('classrooms-evaluations-admin/{classroomId}', [ClassroomController::class, 'showEvaluationsAdmin']); //MODIFIED
 });
